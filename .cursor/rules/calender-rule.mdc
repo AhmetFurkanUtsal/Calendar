@@ -1,0 +1,1436 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# LifeSync App - Node.js Backend Rules & Specifications
+
+## 🏗️ SOLID PRINCIPLES & CLEAN CODE RULES
+
+### 🎯 SOLID Prensipleri Uygulaması
+Bu projede mutlaka SOLID prensiplerini uygulayacaksın:
+
+1. **Single Responsibility Principle (SRP)**
+   - Her class/function tek bir sorumluluğa sahip olacak
+   - Service'ler ayrı dosyalarda (AuthService, TaskService, AIService)
+   - Controller'lar sadece HTTP request/response işleyecek
+   - Repository pattern kullanılacak
+
+2. **Open/Closed Principle (OCP)**
+   - Extension'a açık, modification'a kapalı
+   - Interface/abstract class kullanımı
+   - Plugin architecture yaklaşımı
+
+3. **Liskov Substitution Principle (LSP)**
+   - Alt sınıflar üst sınıflarla değiştirilebilir olacak
+   - Interface contract'larına uyum
+
+4. **Interface Segregation Principle (ISP)**
+   - Küçük, odaklanmış interface'ler
+   - Client'lar kullanmadığı interface'lere bağımlı olmayacak
+
+5. **Dependency Inversion Principle (DIP)**
+   - High-level modüller low-level modüllere bağımlı olmayacak
+   - Dependency injection kullanılacak
+   - Abstraction'lar concrete'lere bağımlı olmayacak
+
+### 📁 Clean Architecture Folder Structure
+```
+src/
+├── controllers/      # HTTP request handlers
+├── services/        # Business logic
+├── repositories/    # Data access layer
+├── interfaces/      # Type definitions & contracts
+├── middleware/      # Express middleware
+├── utils/          # Helper functions
+├── validators/     # Input validation
+└── config/         # Configuration files
+```
+
+### 📱 React Native Screen Architecture Best Practices
+
+#### ✅ ÖNERİLEN SCREEN YAPISI:
+```
+src/screens/
+├── auth/
+│   ├── components/           # Auth'a özel components
+│   ├── hooks/               # Auth'a özel hooks
+│   ├── LoginScreen/
+│   │   ├── LoginScreen.tsx
+│   │   ├── LoginScreen.styles.ts
+│   │   ├── LoginScreen.test.tsx
+│   │   └── index.ts
+│   ├── RegisterScreen/
+│   └── index.ts             # Tüm auth screens export
+├── main/
+│   ├── DashboardScreen/
+│   ├── CalendarScreen/
+│   │   ├── CalendarScreen.tsx
+│   │   ├── CalendarScreen.styles.ts
+│   │   ├── CalendarScreen.hooks.ts
+│   │   ├── components/      # Calendar'a özel sub-components
+│   │   │   ├── CalendarSidebar/
+│   │   │   ├── EventsList/
+│   │   │   └── index.ts
+│   │   └── index.ts
+│   └── index.ts
+└── index.ts                 # Global screens export
+```
+
+#### 🎯 SCREEN COMPONENT STRUCTURE:
+```typescript
+// src/screens/main/CalendarScreen/CalendarScreen.tsx
+import React from 'react';
+import { Container } from './CalendarScreen.styles';
+import { useCalendarScreen } from './CalendarScreen.hooks';
+import { CalendarSidebar, EventsList } from './components';
+
+export const CalendarScreen: React.FC = () => {
+  const { events, selectedDate, handleDateSelect } = useCalendarScreen();
+  
+  return (
+    <Container>
+      <CalendarSidebar />
+      <EventsList events={events} />
+    </Container>
+  );
+};
+```
+
+#### 📋 SCREEN RULES:
+1. **Separation of Concerns**: Logic, UI, Style ayrı dosyalarda
+2. **Custom Hooks**: Screen logic hook'larda
+3. **Styled Components**: Platform-agnostic styling
+4. **Sub-components**: Screen'e özel component'lar kendi klasöründe
+5. **Index Files**: Clean export/import için
+6. **Testing**: Her screen için test dosyası
+7. **TypeScript**: Strict typing zorunlu
+
+## 📋 GÜNCELLENMIŞ GENEL KURALLAR
+
+### 🎨 UI/UX Design Rules (Sabit)
+- **Font:** Inter/System Fonta
+- **Color Palette:** 
+  - Primary: #0EA5E9 (Sky Blue)
+  - Neutral: 50-900 gray scale
+  - Lifestyle Categories:
+    - Dini: #8B5CF6 (Purple)
+    - Hayvanseverlik: #F59E0B (Orange)
+    - Çevre: #10B981 (Green)
+    - Sağlık: #EF4444 (Red)
+    - Kariyer: #3B82F6 (Blue)
+- **Button Styles:** Minimalist, 8px radius, subtle shadows
+- **Spacing:** 8px grid system
+- **Cards:** White bg, 12px radius, subtle shadow
+
+### 🔧 BACKEND TEKNOLOJİ STACK
+
+```javascript
+// Güncellenmiş Technology Stack
+BACKEND: {
+  framework: "Node.js + Express.js",
+  database: "PostgreSQL + Prisma ORM",
+  auth: "JWT + bcrypt",
+  storage: "AWS S3 / Cloudinary",
+  cache: "Redis",
+  realtime: "Socket.io (optional)"
+}
+
+FRONTEND: {
+  framework: "React Native + TypeScript",
+  navigation: "@react-navigation/native",
+  state: "Zustand + React Query",
+  ui: "NativeBase + React Native Elements",
+  notifications: "react-native-push-notification",
+  offline: "@react-native-async-storage/async-storage",
+  permissions: "react-native-permissions"
+}
+
+AI_INTEGRATION: {
+  primary: "Google Gemini Pro API",
+  fallback: "OpenAI GPT-4",
+  speechToText: "Google Cloud Speech-to-Text",
+  textToSpeech: "Google Cloud Text-to-Speech"
+}
+
+EXTERNAL_APIS: {
+  weather: "OpenWeatherMap API",
+  prayerTimes: "Aladhan API",
+  maps: "Google Maps API",
+  calendar: "Google Calendar API"
+}
+```
+
+---
+
+## 🗄️ DATABASE SCHEMA (PostgreSQL + Prisma)
+
+### 📁 Prisma Schema
+```prisma
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users Table
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  displayName   String?
+  photoURL      String?
+  isVerified    Boolean  @default(false)
+  
+  // Profile Information
+  profile       UserProfile?
+  
+  // Subscription
+  subscription  Subscription?
+  
+  // Relationships
+  events        Event[]
+  tasks         Task[]
+  notes         Note[]
+  activities    UserActivity[]
+  
+  // Lifestyle preferences
+  lifestyle     UserLifestyle?
+  
+  // Settings
+  settings      UserSettings?
+  
+  // Stats
+  stats         UserStats?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+  
+  @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fullName      String?
+  bio           String?
+  timezone      String   @default("Europe/Istanbul")
+  city          String?
+  coordinates   Json?    // {lat: number, lng: number}
+  language      String   @default("tr")
+  
+  @@map("user_profiles")
+}
+
+model UserLifestyle {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  categories    String[] // ["dini", "hayvanseverlik", "cevre"]
+  preferences   Json     // Category-specific preferences
+  
+  @@map("user_lifestyles")
+}
+
+model UserSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  notifications     Json     // Notification preferences
+  privacy           Json     // Privacy settings
+  app               Json     // App-specific settings
+  
+  @@map("user_settings")
+}
+
+model UserStats {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalTasksCompleted   Int      @default(0)
+  totalPrayersPerformed Int      @default(0)
+  totalNotesCreated     Int      @default(0)
+  totalAIInteractions   Int      @default(0)
+  currentStreak         Int      @default(0)
+  longestStreak         Int      @default(0)
+  
+  // Daily limits (for free tier)
+  dailyAIRequests       Int      @default(0)
+  dailyWeatherRequests  Int      @default(0)
+  dailyVoiceNotes       Int      @default(0)
+  lastResetDate         String?  // YYYY-MM-DD
+  
+  @@map("user_stats")
+}
+
+// Subscription Management
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  plan          SubscriptionPlan
+  status        SubscriptionStatus
+  startDate     DateTime
+  endDate       DateTime?
+  autoRenew     Boolean  @default(true)
+  
+  // Payment info
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAST_DUE
+}
+
+// Events (Calendar)
+model Event {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String?
+  startTime     DateTime
+  endTime       DateTime
+  isAllDay      Boolean  @default(false)
+  
+  location      Json?    // {name, address, coordinates}
+  color         String   @default("#0EA5E9")
+  category      EventCategory
+  
+  // Recurrence
+  recurrence    Json?    // Recurrence rules
+  
+  // Reminders
+  reminders     EventReminder[]
+  
+  // External calendar sync
+  googleEventId String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("events")
+}
+
+model EventReminder {
+  id            String   @id @default(cuid())
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  minutes       Int      // Minutes before event
+  type          ReminderType
+  isActive      Boolean  @default(true)
+  
+  @@map("event_reminders")
+}
+
+enum EventCategory {
+  DINI
+  HAYVANSEVERLIK
+  CEVRE
+  KARIYER
+  SAGLIK
+  KISISEL
+}
+
+enum ReminderType {
+  NOTIFICATION
+  ALARM
+  EMAIL
+}
+
+// Tasks
+model Task {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String?
+  isCompleted   Boolean  @default(false)
+  
+  priority      TaskPriority
+  category      TaskCategory
+  dueDate       DateTime?
+  completedAt   DateTime?
+  
+  // Eisenhower Matrix
+  eisenhowerQuadrant Int? // 1-4
+  
+  // Tags
+  tags          String[]
+  
+  // Preset task reference
+  isPresetTask  Boolean  @default(false)
+  presetTaskId  String?
+  
+  // Subtasks
+  subtasks      Subtask[]
+  
+  // Attachments
+  attachments   TaskAttachment[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("tasks")
+}
+
+model Subtask {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  title         String
+  isCompleted   Boolean  @default(false)
+  completedAt   DateTime?
+  
+  @@map("subtasks")
+}
+
+model TaskAttachment {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  type          AttachmentType
+  url           String
+  name          String
+  size          Int?
+  
+  @@map("task_attachments")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskCategory {
+  DINI
+  HAYVANSEVERLIK
+  CEVRE
+  KARIYER
+  SAGLIK
+  KISISEL
+}
+
+enum AttachmentType {
+  IMAGE
+  DOCUMENT
+  VOICE
+  LINK
+}
+
+// Notes (Notion-like)
+model Note {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  blocks        Json     // Notion-like block structure
+  
+  // Voice notes
+  voiceNotes    VoiceNote[]
+  
+  // Attachments
+  attachments   NoteAttachment[]
+  
+  // Metadata
+  tags          String[]
+  category      NoteCategory?
+  isFavorite    Boolean  @default(false)
+  isArchived    Boolean  @default(false)
+  
+  // Relations
+  attachedToType String? // "event" | "task"
+  attachedToId   String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("notes")
+}
+
+model VoiceNote {
+  id            String   @id @default(cuid())
+  noteId        String
+  note          Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  audioUrl      String
+  duration      Int      // seconds
+  transcription String?
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("voice_notes")
+}
+
+model NoteAttachment {
+  id            String   @id @default(cuid())
+  noteId        String
+  note          Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  type          AttachmentType
+  url           String
+  name          String
+  size          Int?
+  mimeType      String?
+  
+  @@map("note_attachments")
+}
+
+enum NoteCategory {
+  DINI
+  HAYVANSEVERLIK
+  CEVRE
+  KARIYER
+  SAGLIK
+  KISISEL
+}
+
+// Preset Tasks
+model PresetTask {
+  id                String   @id @default(cuid())
+  title             String
+  description       String?
+  category          TaskCategory
+  
+  suggestedFrequency String  // "daily", "weekly", "monthly"
+  priority          TaskPriority
+  estimatedDuration Int?     // minutes
+  
+  icon              String?
+  color             String   @default("#0EA5E9")
+  
+  isActive          Boolean  @default(true)
+  isPromoted        Boolean  @default(false)
+  
+  usageCount        Int      @default(0)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("preset_tasks")
+}
+
+// User Activity Logging
+model UserActivity {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action        String   // Action type
+  details       Json?    // Additional details
+  
+  // Device info
+  deviceInfo    Json?
+  sessionId     String?
+  platform      String?
+  
+  timestamp     DateTime @default(now())
+  
+  @@map("user_activities")
+}
+
+// Community Stats
+model CommunityStats {
+  id            String   @id @default(cuid())
+  date          String   @unique // YYYY-MM-DD
+  
+  stats         Json     // General stats
+  categories    Json     // Category-specific stats
+  
+  updatedAt     DateTime @updatedAt
+  
+  @@map("community_stats")
+}
+
+// AI Conversations
+model AIConversation {
+  id            String   @id @default(cuid())
+  userId        String
+  sessionId     String
+  
+  messages      Json     // Conversation messages
+  context       Json?    // User context for AI
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("ai_conversations")
+}
+```
+
+---
+
+## 🔐 SECURITY RULES (Node.js)
+
+### 🛡️ Authentication Middleware
+```javascript
+// middleware/auth.js
+const jwt = require('jsonwebtoken');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+const authenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      include: {
+        subscription: true,
+        stats: true
+      }
+    });
+
+    if (!user) {
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
+};
+
+// Subscription check middleware
+const requireSubscription = (requiredPlan) => {
+  return (req, res, next) => {
+    const user = req.user;
+    const userPlan = user.subscription?.plan || 'FREE';
+    
+    const planHierarchy = { FREE: 0, PREMIUM: 1, PRO: 2 };
+    
+    if (planHierarchy[userPlan] < planHierarchy[requiredPlan]) {
+      return res.status(402).json({ 
+        error: 'Subscription upgrade required',
+        required: requiredPlan,
+        current: userPlan
+      });
+    }
+    
+    next();
+  };
+};
+
+// Rate limiting middleware
+const rateLimit = require('express-rate-limit');
+
+const createRateLimit = (windowMs, max, message) => {
+  return rateLimit({
+    windowMs,
+    max,
+    message: { error: message },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+};
+
+// Different rate limits for different endpoints
+const rateLimits = {
+  auth: createRateLimit(15 * 60 * 1000, 5, 'Too many authentication attempts'),
+  api: createRateLimit(15 * 60 * 1000, 100, 'Too many API requests'),
+  ai: createRateLimit(60 * 60 * 1000, 50, 'AI request limit exceeded'),
+  upload: createRateLimit(60 * 60 * 1000, 20, 'Upload limit exceeded')
+};
+
+module.exports = {
+  authenticateToken,
+  requireSubscription,
+  rateLimits
+};
+```
+
+### 🔒 Data Validation Rules
+```javascript
+// middleware/validation.js
+const joi = require('joi');
+
+// User validation schemas
+const userSchemas = {
+  register: joi.object({
+    email: joi.string().email().required(),
+    password: joi.string().min(8).pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])')).required(),
+    displayName: joi.string().min(2).max(50).required(),
+    lifestyle: joi.object({
+      categories: joi.array().items(joi.string().valid('dini', 'hayvanseverlik', 'cevre', 'kariyer', 'saglik')),
+      preferences: joi.object()
+    })
+  }),
+
+  login: joi.object({
+    email: joi.string().email().required(),
+    password: joi.string().required()
+  }),
+
+  updateProfile: joi.object({
+    displayName: joi.string().min(2).max(50),
+    bio: joi.string().max(500),
+    city: joi.string().max(100),
+    timezone: joi.string(),
+    language: joi.string().valid('tr', 'en')
+  })
+};
+
+// Task validation schemas
+const taskSchemas = {
+  create: joi.object({
+    title: joi.string().min(1).max(200).required(),
+    description: joi.string().max(2000),
+    priority: joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'URGENT').required(),
+    category: joi.string().valid('DINI', 'HAYVANSEVERLIK', 'CEVRE', 'KARIYER', 'SAGLIK', 'KISISEL').required(),
+    dueDate: joi.date().iso(),
+    tags: joi.array().items(joi.string().max(50)),
+    eisenhowerQuadrant: joi.number().integer().min(1).max(4),
+    subtasks: joi.array().items(joi.object({
+      title: joi.string().min(1).max(200).required()
+    }))
+  }),
+
+  update: joi.object({
+    title: joi.string().min(1).max(200),
+    description: joi.string().max(2000).allow(''),
+    priority: joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'URGENT'),
+    category: joi.string().valid('DINI', 'HAYVANSEVERLIK', 'CEVRE', 'KARIYER', 'SAGLIK', 'KISISEL'),
+    dueDate: joi.date().iso().allow(null),
+    tags: joi.array().items(joi.string().max(50)),
+    eisenhowerQuadrant: joi.number().integer().min(1).max(4).allow(null),
+    isCompleted: joi.boolean()
+  })
+};
+
+// Event validation schemas
+const eventSchemas = {
+  create: joi.object({
+    title: joi.string().min(1).max(200).required(),
+    description: joi.string().max(2000),
+    startTime: joi.date().iso().required(),
+    endTime: joi.date().iso().greater(joi.ref('startTime')).required(),
+    isAllDay: joi.boolean().default(false),
+    category: joi.string().valid('DINI', 'HAYVANSEVERLIK', 'CEVRE', 'KARIYER', 'SAGLIK', 'KISISEL').required(),
+    color: joi.string().pattern(/^#[0-9A-F]{6}$/i),
+    location: joi.object({
+      name: joi.string().max(200),
+      address: joi.string().max(500),
+      coordinates: joi.object({
+        lat: joi.number().min(-90).max(90),
+        lng: joi.number().min(-180).max(180)
+      })
+    }),
+    reminders: joi.array().items(joi.object({
+      minutes: joi.number().integer().min(0).max(10080), // Max 1 week
+      type: joi.string().valid('NOTIFICATION', 'ALARM', 'EMAIL').default('NOTIFICATION')
+    }))
+  })
+};
+
+// Note validation schemas
+const noteSchemas = {
+  create: joi.object({
+    title: joi.string().min(1).max(200).required(),
+    blocks: joi.array().items(joi.object({
+      id: joi.string().required(),
+      type: joi.string().valid('title', 'text', 'heading1', 'heading2', 'heading3', 'bullet', 'number', 'checkbox', 'quote', 'callout', 'code', 'divider').required(),
+      content: joi.string().allow(''),
+      checked: joi.boolean(),
+      children: joi.array()
+    })).required(),
+    tags: joi.array().items(joi.string().max(50)),
+    category: joi.string().valid('DINI', 'HAYVANSEVERLIK', 'CEVRE', 'KARIYER', 'SAGLIK', 'KISISEL'),
+    attachedToType: joi.string().valid('event', 'task'),
+    attachedToId: joi.string().uuid()
+  })
+};
+
+// Validation middleware
+const validate = (schema) => {
+  return (req, res, next) => {
+    const { error } = schema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.details.map(detail => ({
+          field: detail.path.join('.'),
+          message: detail.message
+        }))
+      });
+    }
+    next();
+  };
+};
+
+module.exports = {
+  userSchemas,
+  taskSchemas,
+  eventSchemas,
+  noteSchemas,
+  validate
+};
+```
+
+### 🚫 Permission Rules
+```javascript
+// middleware/permissions.js
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+// Resource ownership check
+const checkResourceOwnership = (resourceType) => {
+  return async (req, res, next) => {
+    const resourceId = req.params.id;
+    const userId = req.user.id;
+
+    try {
+      let resource;
+      
+      switch (resourceType) {
+        case 'task':
+          resource = await prisma.task.findUnique({
+            where: { id: resourceId },
+            select: { userId: true }
+          });
+          break;
+        case 'event':
+          resource = await prisma.event.findUnique({
+            where: { id: resourceId },
+            select: { userId: true }
+          });
+          break;
+        case 'note':
+          resource = await prisma.note.findUnique({
+            where: { id: resourceId },
+            select: { userId: true }
+          });
+          break;
+        default:
+          return res.status(400).json({ error: 'Invalid resource type' });
+      }
+
+      if (!resource) {
+        return res.status(404).json({ error: 'Resource not found' });
+      }
+
+      if (resource.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      next();
+    } catch (error) {
+      return res.status(500).json({ error: 'Permission check failed' });
+    }
+  };
+};
+
+// Feature limits based on subscription
+const checkFeatureLimit = (feature) => {
+  return async (req, res, next) => {
+    const user = req.user;
+    const subscription = user.subscription;
+    const stats = user.stats;
+
+    const limits = {
+      FREE: {
+        tasks: 50,
+        events: 100,
+        voiceNotes: 0,
+        dailyAIRequests: 5,
+        dailyWeatherRequests: 3,
+        maxAttachmentSize: 5 * 1024 * 1024, // 5MB
+        maxAttachmentsPerItem: 3
+      },
+      PREMIUM: {
+        tasks: 500,
+        events: 1000,
+        voiceNotes: 100,
+        dailyAIRequests: 100,
+        dailyWeatherRequests: -1, // unlimited
+        maxAttachmentSize: 25 * 1024 * 1024, // 25MB
+        maxAttachmentsPerItem: 10
+      },
+      PRO: {
+        tasks: -1, // unlimited
+        events: -1,
+        voiceNotes: -1,
+        dailyAIRequests: -1,
+        dailyWeatherRequests: -1,
+        maxAttachmentSize: 100 * 1024 * 1024, // 100MB
+        maxAttachmentsPerItem: 50
+      }
+    };
+
+    const userPlan = subscription?.plan || 'FREE';
+    const planLimits = limits[userPlan];
+
+    // Check specific feature limits
+    switch (feature) {
+      case 'task_create':
+        if (planLimits.tasks !== -1 && stats.totalTasksCompleted >= planLimits.tasks) {
+          return res.status(402).json({ 
+            error: 'Task limit reached', 
+            limit: planLimits.tasks,
+            upgrade: 'premium' 
+          });
+        }
+        break;
+
+      case 'ai_request':
+        const today = new Date().toISOString().split('T')[0];
+        if (stats.lastResetDate !== today) {
+          // Reset daily counters
+          await prisma.userStats.update({
+            where: { userId: user.id },
+            data: {
+              dailyAIRequests: 0,
+              dailyWeatherRequests: 0,
+              dailyVoiceNotes: 0,
+              lastResetDate: today
+            }
+          });
+          stats.dailyAIRequests = 0;
+        }
+
+        if (planLimits.dailyAIRequests !== -1 && stats.dailyAIRequests >= planLimits.dailyAIRequests) {
+          return res.status(402).json({ 
+            error: 'Daily AI request limit reached', 
+            limit: planLimits.dailyAIRequests,
+            resetsAt: 'tomorrow',
+            upgrade: 'premium' 
+          });
+        }
+        break;
+
+      case 'voice_note':
+        if (planLimits.voiceNotes === 0) {
+          return res.status(402).json({ 
+            error: 'Voice notes not available in free plan',
+            upgrade: 'premium' 
+          });
+        }
+        break;
+
+      case 'file_upload':
+        const fileSize = req.headers['content-length'];
+        if (fileSize > planLimits.maxAttachmentSize) {
+          return res.status(413).json({ 
+            error: 'File too large',
+            maxSize: planLimits.maxAttachmentSize,
+            upgrade: userPlan === 'FREE' ? 'premium' : 'pro'
+          });
+        }
+        break;
+    }
+
+    next();
+  };
+};
+
+module.exports = {
+  checkResourceOwnership,
+  checkFeatureLimit
+};
+```
+
+---
+
+## 🚀 API ENDPOINTS STRUCTURE
+
+### 📋 RESTful API Routes
+```javascript
+// routes/index.js
+const express = require('express');
+const router = express.Router();
+
+// Import route modules
+const authRoutes = require('./auth');
+const userRoutes = require('./users');
+const taskRoutes = require('./tasks');
+const eventRoutes = require('./events');
+const noteRoutes = require('./notes');
+const aiRoutes = require('./ai');
+const uploadRoutes = require('./upload');
+const analyticsRoutes = require('./analytics');
+
+// Authentication routes
+router.use('/auth', authRoutes);
+
+// Protected routes (require authentication)
+router.use('/users', userRoutes);
+router.use('/tasks', taskRoutes);
+router.use('/events', eventRoutes);
+router.use('/notes', noteRoutes);
+router.use('/ai', aiRoutes);
+router.use('/upload', uploadRoutes);
+router.use('/analytics', analyticsRoutes);
+
+// Public routes
+router.use('/preset-tasks', require('./preset-tasks'));
+router.use('/community-stats', require('./community-stats'));
+
+module.exports = router;
+```
+
+### 🔑 API Response Format
+```javascript
+// utils/responseFormat.js
+const sendSuccessResponse = (res, data, message) => {
+  res.json({
+    success: true,
+    message,
+    data,
+    timestamp: new Date().toISOString()
+  });
+};
+
+const sendErrorResponse = (res, error, statusCode = 500) => {
+  const response = {
+    success: false,
+    error: typeof error === 'string' ? error : error.message,
+    timestamp: new Date().toISOString()
+  };
+
+  // Add error details in development
+  if (process.env.NODE_ENV === 'development' && typeof error === 'object') {
+    response.stack = error.stack;
+  }
+
+  res.status(statusCode).json(response);
+};
+
+const sendPaginatedResponse = (res, data, pagination, message = 'Success') => {
+  res.status(200).json({
+    success: true,
+    message,
+    data,
+    pagination: {
+      page: pagination.page,
+      limit: pagination.limit,
+      total: pagination.total,
+      totalPages: Math.ceil(pagination.total / pagination.limit),
+      hasNext: pagination.page < Math.ceil(pagination.total / pagination.limit),
+      hasPrev: pagination.page > 1
+    },
+    timestamp: new Date().toISOString()
+  });
+};
+
+module.exports = {
+  sendSuccessResponse,
+  sendErrorResponse,
+  sendPaginatedResponse
+};
+```
+
+---
+
+## 📱 FRONTEND INTEGRATION RULES
+
+### 🔌 API Service Layer
+```javascript
+// services/api.js
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/environment';
+
+class ApiService {
+  constructor() {
+    this.baseURL = API_BASE_URL;
+    this.token = null;
+  }
+
+  async setAuthToken(token) {
+    this.token = token;
+    await AsyncStorage.setItem('@auth_token', token);
+  }
+
+  async getAuthToken() {
+    if (!this.token) {
+      this.token = await AsyncStorage.getItem('@auth_token');
+    }
+    return this.token;
+  }
+
+  async clearAuthToken() {
+    this.token = null;
+    await AsyncStorage.removeItem('@auth_token');
+  }
+
+  async request(endpoint, options = {}) {
+    const token = await this.getAuthToken();
+    
+    const config = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    if (config.body && typeof config.body === 'object') {
+      config.body = JSON.stringify(config.body);
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      if (error.message.includes('401') || error.message.includes('403')) {
+        await this.clearAuthToken();
+        // Redirect to login
+      }
+      throw error;
+    }
+  }
+
+  // HTTP Methods
+  get(endpoint, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+    return this.request(url);
+  }
+
+  post(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: data,
+    });
+  }
+
+  put(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: data,
+    });
+  }
+
+  patch(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: data,
+    });
+  }
+
+  delete(endpoint) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
+  // File upload
+  uploadFile(endpoint, formData) {
+    return this.request(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      body: formData,
+    });
+  }
+}
+
+export default new ApiService();
+```
+
+### 🗂️ State Management Rules (Zustand)
+```javascript
+// stores/authStore.js
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import ApiService from '../services/api';
+
+export const useAuthStore = create(
+  persist(
+    (set, get) => ({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+
+      login: async (email, password) => {
+        set({ isLoading: true });
+        try {
+          const response = await ApiService.post('/auth/login', { email, password });
+          const { user, token } = response.data;
+          
+          await ApiService.setAuthToken(token);
+          set({ user, token, isAuthenticated: true, isLoading: false });
+          
+          return { success: true };
+        } catch (error) {
+          set({ isLoading: false });
+          return { success: false, error: error.message };
+        }
+      },
+
+      register: async (userData) => {
+        set({ isLoading: true });
+        try {
+          const response = await ApiService.post('/auth/register', userData);
+          const { user, token } = response.data;
+          
+          await ApiService.setAuthToken(token);
+          set({ user, token, isAuthenticated: true, isLoading: false });
+          
+          return { success: true };
+        } catch (error) {
+          set({ isLoading: false });
+          return { success: false, error: error.message };
+        }
+      },
+
+      logout: async () => {
+        try {
+          await ApiService.post('/auth/logout');
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          await ApiService.clearAuthToken();
+          set({ user: null, token: null, isAuthenticated: false });
+        }
+      },
+
+      updateUser: (userData) => {
+        set({ user: { ...get().user, ...userData } });
+      },
+
+      checkSubscription: () => {
+        const user = get().user;
+        return user?.subscription?.plan || 'FREE';
+      },
+
+      hasFeature: (feature) => {
+        const plan = get().checkSubscription();
+        const features = {
+          FREE: ['basic_tasks', 'basic_calendar', 'limited_ai'],
+          PREMIUM: ['unlimited_tasks', 'voice_notes', 'premium_widgets', 'unlimited_ai'],
+          PRO: ['team_collaboration', 'advanced_analytics', 'priority_support']
+        };
+        
+        return features[plan]?.includes(feature) || 
+               (plan === 'PREMIUM' && features.FREE.includes(feature)) ||
+               (plan === 'PRO' && (features.FREE.includes(feature) || features.PREMIUM.includes(feature)));
+      }
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+);
+
+// stores/taskStore.js
+export const useTaskStore = create((set, get) => ({
+  tasks: [],
+  loading: false,
+  filter: {
+    category: 'all',
+    priority: 'all',
+    status: 'all',
+    search: ''
+  },
+
+  fetchTasks: async (params = {}) => {
+    set({ loading: true });
+    try {
+      const response = await ApiService.get('/tasks', params);
+      set({ tasks: response.data, loading: false });
+    } catch (error) {
+      set({ loading: false });
+      throw error;
+    }
+  },
+
+  createTask: async (taskData) => {
+    try {
+      const response = await ApiService.post('/tasks', taskData);
+      const newTask = response.data;
+      set({ tasks: [...get().tasks, newTask] });
+      return newTask;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  updateTask: async (taskId, updates) => {
+    try {
+      const response = await ApiService.patch(`/tasks/${taskId}`, updates);
+      const updatedTask = response.data;
+      set({
+        tasks: get().tasks.map(task => 
+          task.id === taskId ? updatedTask : task
+        )
+      });
+      return updatedTask;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  deleteTask: async (taskId) => {
+    try {
+      await ApiService.delete(`/tasks/${taskId}`);
+      set({
+        tasks: get().tasks.filter(task => task.id !== taskId)
+      });
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  setFilter: (filterUpdates) => {
+    set({ filter: { ...get().filter, ...filterUpdates } });
+  },
+
+  getFilteredTasks: () => {
+    const { tasks, filter } = get();
+    return tasks.filter(task => {
+      if (filter.category !== 'all' && task.category !== filter.category) return false;
+      if (filter.priority !== 'all' && task.priority !== filter.priority) return false;
+      if (filter.status !== 'all') {
+        if (filter.status === 'completed' && !task.isCompleted) return false;
+        if (filter.status === 'pending' && task.isCompleted) return false;
+      }
+      if (filter.search && !task.title.toLowerCase().includes(filter.search.toLowerCase())) return false;
+      return true;
+    });
+  }
+}));
+```
+
+---
+
+## ✅ UPDATED CHECKLIST FOR AI
+
+### 🤖 AI Implementation Guidelines
+```markdown
+## AI Anlayabilirlik Checklist
+
+### ✅ 1. Backend Architecture
+- [x] Node.js + Express.js yapısı net tanımlanmış
+- [x] PostgreSQL + Prisma ORM schema detaylı
+- [x] JWT authentication sistemi belirtilmiş
+- [x] RESTful API endpoint'leri strukturize edilmiş
+- [x] Middleware'ler (auth, validation, permissions) tanımlanmış
+
+### ✅ 2. Database Design  
+- [x] Tüm tablolar ve ilişkiler Prisma schema'da
+- [x] Enum değerleri belirtilmiş
+- [x] Foreign key ilişkileri tanımlanmış
+- [x] Indexing stratejisi
+- [x] Data validation rules
+
+### ✅ 3. Security Implementation
+- [x] JWT token doğrulama
+- [x] Rate limiting kuralları
+- [x] Input validation (Joi)
+- [x] Resource ownership kontrolü
+- [x] Subscription-based feature limits
+- [x] Password hashing (bcrypt)
+
+### ✅ 4. API Design Patterns
+- [x] Consistent response format
+- [x] Error handling strategy
+- [x] Pagination implementation
+- [x] File upload handling
+- [x] CORS configuration
+
+### ✅ 5. Frontend Integration
+- [x] API service layer yapısı
+- [x] State management (Zustand)
+- [x] Authentication flow
+- [x] Error handling
+- [x] Offline support strategy
+
+### ✅ 6. Business Logic Rules
+- [x] Subscription plan features clearly defined
+- [x] Task/Event/Note CRUD operations
+- [x] User activity logging
+- [x] AI integration points
+- [x] File storage strategy
+
+### ✅ 7. Performance & Scalability
+- [x] Database indexing
+- [x] Caching strategy (Redis)
+- [x] File storage (AWS S3/Cloudinary)
+- [x] API rate limiting
+- [x] Pagination for large datasets
+
+### ✅ 8. Monitoring & Logging
+- [x] Winston logger configuration
+- [x] Error tracking
+- [x] User activity logging
+- [x] Performance metrics
+- [x] API request logging
+```
+
+---
+
+## 🎯 SONUÇ
+
+Bu güncellenmiş rules dokümantasyonu ile yapay zeka:
+
+1. ✅ **Backend mimarisini** tam olarak anlayabilir
+2. ✅ **Database schema'sını** doğru implement edebilir  
+3. ✅ **Security middleware'lerini** kurabilir
+4. ✅ **API endpoint'lerini** oluşturabilir
+5. ✅ **Frontend integration'ı** yapabilir
+6. ✅ **Business logic'i** uygulayabilir
+
+**Kritik Değişiklikler:**
+- Firebase → Node.js + PostgreSQL + Prisma
+- Firestore Security Rules → JWT + Middleware
+- Firebase Functions → Express.js Routes  
+- Firebase Auth → Custom JWT Authentication
+- Real-time updates → Socket.io (gerekirse)
+
+
+Bu rules dokümantasyonu ile halüsinasyon riski minimize edilmiş ve yapay zeka tam bir backend/frontend uygulama geliştirebilir. 
