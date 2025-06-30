@@ -1,0 +1,391 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// USER MANAGEMENT
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  displayName   String?
+  photoURL      String?
+  isVerified    Boolean  @default(false)
+  
+  // Relations
+  profile       UserProfile?
+  subscription  Subscription?
+  events        Event[]
+  tasks         Task[]
+  notes         Note[]
+  activities    UserActivity[]
+  deviceTokens  DeviceToken[]
+  lifestyle     UserLifestyle?
+  settings      UserSettings?
+  stats         UserStats?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+  
+  @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fullName      String?
+  bio           String?
+  timezone      String   @default("Europe/Istanbul")
+  city          String?
+  coordinates   Json?    // {lat: number, lng: number}
+  language      String   @default("tr")
+  
+  @@map("user_profiles")
+}
+
+model UserLifestyle {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  categories    String[] // ["dini", "hayvanseverlik", "cevre"]
+  preferences   Json     // Category-specific preferences
+  
+  @@map("user_lifestyles")
+}
+
+model UserSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  notifications         Json     @default("{}")
+  privacy               Json     @default("{}")
+  appearance            Json     @default("{}")
+  
+  @@map("user_settings")
+}
+
+// SUBSCRIPTION SYSTEM
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  plan          SubscriptionPlan
+  status        SubscriptionStatus
+  startDate     DateTime
+  endDate       DateTime?
+  autoRenew     Boolean  @default(true)
+  
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+  PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAST_DUE
+}
+
+// TASK MANAGEMENT
+model Task {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String?
+  isCompleted   Boolean  @default(false)
+  
+  priority      TaskPriority
+  category      TaskCategory
+  dueDate       DateTime?
+  completedAt   DateTime?
+  
+  eisenhowerQuadrant Int? // 1-4
+  tags          String[]
+  
+  isPresetTask  Boolean  @default(false)
+  presetTaskId  String?
+  
+  subtasks      Subtask[]
+  attachments   TaskAttachment[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("tasks")
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskCategory {
+  DINI
+  HAYVANSEVERLIK
+  CEVRE
+  KARIYER
+  SAGLIK
+  KISISEL
+}
+
+model Subtask {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  title         String
+  isCompleted   Boolean  @default(false)
+  completedAt   DateTime?
+  
+  @@map("subtasks")
+}
+
+model TaskAttachment {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  fileName      String
+  fileUrl       String
+  fileSize      Int
+  mimeType      String
+  
+  uploadedAt    DateTime @default(now())
+  
+  @@map("task_attachments")
+}
+
+// CALENDAR EVENTS
+model Event {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  description   String?
+  startTime     DateTime
+  endTime       DateTime
+  isAllDay      Boolean  @default(false)
+  
+  location      Json?
+  color         String   @default("#0EA5E9")
+  category      EventCategory
+  
+  recurrence    Json?
+  reminders     EventReminder[]
+  googleEventId String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("events")
+}
+
+enum EventCategory {
+  DINI
+  HAYVANSEVERLIK
+  CEVRE
+  KARIYER
+  SAGLIK
+  KISISEL
+}
+
+model EventReminder {
+  id            String   @id @default(cuid())
+  eventId       String
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  minutesBefore Int
+  type          ReminderType
+  
+  @@map("event_reminders")
+}
+
+enum ReminderType {
+  NOTIFICATION
+  EMAIL
+  SMS
+}
+
+// NOTION-LIKE NOTES
+model Note {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title         String
+  blocks        Json     // Notion-like block structure
+  
+  voiceNotes    VoiceNote[]
+  attachments   NoteAttachment[]
+  
+  tags          String[]
+  category      NoteCategory?
+  isFavorite    Boolean  @default(false)
+  isArchived    Boolean  @default(false)
+  
+  attachedToType String? // "event" | "task"
+  attachedToId   String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@map("notes")
+}
+
+model VoiceNote {
+  id            String   @id @default(cuid())
+  noteId        String
+  note          Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  audioUrl      String
+  duration      Int      // seconds
+  transcription String?
+  
+  createdAt     DateTime @default(now())
+  
+  @@map("voice_notes")
+}
+
+model NoteAttachment {
+  id            String   @id @default(cuid())
+  noteId        String
+  note          Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  fileName      String
+  fileUrl       String
+  fileSize      Int
+  mimeType      String
+  
+  uploadedAt    DateTime @default(now())
+  
+  @@map("note_attachments")
+}
+
+enum NoteCategory {
+  DINI
+  HAYVANSEVERLIK
+  CEVRE
+  KARIYER
+  SAGLIK
+  KISISEL
+}
+
+// USER ACTIVITY LOGGING (ÖNEMLİ ÖZEL İSTEK)
+model UserActivity {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action        String   // Action type
+  details       Json?    // Additional details
+  
+  deviceInfo    Json?
+  sessionId     String?
+  platform      String?
+  
+  timestamp     DateTime @default(now())
+  
+  @@map("user_activities")
+  @@index([userId, timestamp])
+  @@index([action, timestamp])
+}
+
+// SOCIAL FEATURES & STATS
+model CommunityStats {
+  id            String   @id @default(cuid())
+  date          String   @unique // YYYY-MM-DD
+  
+  stats         Json     // General stats
+  categories    Json     // Category-specific stats
+  
+  updatedAt     DateTime @updatedAt
+  
+  @@map("community_stats")
+}
+
+// USER STATISTICS
+model UserStats {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalTasksCreated     Int      @default(0)
+  totalTasksCompleted   Int      @default(0)
+  totalPrayersPerformed Int      @default(0)
+  totalNotesCreated     Int      @default(0)
+  totalAIInteractions   Int      @default(0)
+  currentStreak         Int      @default(0)
+  longestStreak         Int      @default(0)
+  
+  dailyAIRequests       Int      @default(0)
+  dailyWeatherRequests  Int      @default(0)
+  dailyVoiceNotes       Int      @default(0)
+  lastResetDate         String?  // YYYY-MM-DD
+  
+  @@map("user_stats")
+}
+
+// PRESET TASKS
+model PresetTask {
+  id                String   @id @default(cuid())
+  title             String
+  description       String?
+  category          TaskCategory
+  
+  suggestedFrequency String  // "daily", "weekly", "monthly"
+  priority          TaskPriority
+  estimatedDuration Int?     // minutes
+  
+  icon              String?
+  color             String   @default("#0EA5E9")
+  
+  isActive          Boolean  @default(true)
+  isPromoted        Boolean  @default(false)
+  
+  usageCount        Int      @default(0)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("preset_tasks")
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   // "ios" or "android"
+  createdAt DateTime @default(now())
+
+  @@map("device_tokens")
+} 
