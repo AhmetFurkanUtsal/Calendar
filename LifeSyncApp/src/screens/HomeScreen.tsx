@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import {DesignSystem} from '../theme/designSystem';
 import apiService from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // --- Types ---
 interface Task {
@@ -322,60 +323,109 @@ export const HomeScreen: React.FC = () => {
   const [weatherCity] = useState<string>('Afyonkarahisar, Sandıklı');
 
   useEffect(() => {
-    const fetchWeather = async () => {
+    const thirtyMinutes = 30 * 60 * 1000; // 30 dakika
+
+    const fetchWeatherWithCache = async () => {
       try {
-        // API'ye şehir adı olarak "Afyonkarahisar" gönderiyoruz, fakat arayüzde Sandıklı olarak göstereceğiz
-        const response = await apiService.getWeather('Afyonkarahisar');
+        // Cache kontrolü - Son güncellemeden 30 dakika geçmiş mi?
+        const lastFetch = await AsyncStorage.getItem('@weather_last_fetch');
+        const cachedWeather = await AsyncStorage.getItem('@weather_cache');
 
-        // API'nin döndüğü yapı: {success: true, data: {location: {...}, current: {...}}}
-        if (response && response.success && response.data) {
-          const {location, current} = response.data;
+        const now = new Date().getTime();
 
-          // Debug için API verisini console'a yazdır
-          console.log('🌤️ Weather API Response:', {
-            location: location.name,
-            temp_c: current.temp_c,
-            condition: current.condition,
-            'condition.code': current.condition.code,
-            'condition.text': current.condition.text,
-          });
-
-          // Debug: Forecast verisinin varlığını kontrol et
-          console.log('📊 Forecast Data Debug:', {
-            'response.data': Object.keys(response.data),
-            forecast_exists: !!response.data.forecast,
-            forecast_content: response.data.forecast,
-          });
-
-          console.log(
-            '🎯 Icon mapping için condition code:',
-            current.condition.code,
-          );
-
-          const weatherData: Weather = {
-            temp: Math.round(current.temp_c),
-            description: current.condition.text,
-            iconUrl: current.condition.icon,
-            humidity: current.humidity,
-            uv: current.uv,
-            air_quality: current.air_quality,
-            isDay: current.is_day,
-            minTemp: response.data.forecast?.mintemp_c || current.temp_c - 5,
-            maxTemp: response.data.forecast?.maxtemp_c || current.temp_c + 5,
-          };
-          setWeather(weatherData);
-        } else {
-          console.error('Invalid weather data format:', response);
+        // Cache varsa ve 30 dakikadan eski değilse cache'den kullan
+        if (
+          lastFetch &&
+          cachedWeather &&
+          now - parseInt(lastFetch) < thirtyMinutes
+        ) {
+          console.log('🔄 Using cached weather data');
+          setWeather(JSON.parse(cachedWeather));
+          setWeatherLoading(false);
+          return;
         }
+
+        console.log('🌐 Fetching fresh weather data');
+        await fetchWeather();
       } catch (error) {
-        console.error('Failed to fetch weather:', error);
-      } finally {
-        setWeatherLoading(false);
+        console.error('Weather cache error:', error);
+        await fetchWeather(); // Fallback to direct fetch
       }
     };
 
-    fetchWeather();
+    fetchWeatherWithCache();
+
+    // Her 30 dakikada bir otomatik güncelleme
+    const weatherInterval = setInterval(fetchWeatherWithCache, thirtyMinutes);
+
+    return () => clearInterval(weatherInterval);
   }, []);
+
+  const fetchWeather = async () => {
+    try {
+      setWeatherLoading(true);
+      // API'ye şehir adı olarak "Afyonkarahisar" gönderiyoruz, fakat arayüzde Sandıklı olarak göstereceğiz
+      const response = await apiService.getWeather('Afyonkarahisar');
+
+      // API'nin döndüğü yapı: {success: true, data: {location: {...}, current: {...}}}
+      if (response && response.success && response.data) {
+        const {location, current} = response.data;
+
+        // Debug için API verisini console'a yazdır
+        console.log('🌤️ Weather API Response:', {
+          location: location.name,
+          temp_c: current.temp_c,
+          condition: current.condition,
+          'condition.code': current.condition.code,
+          'condition.text': current.condition.text,
+        });
+
+        // Debug: Forecast verisinin varlığını kontrol et
+        console.log('📊 Forecast Data Debug:', {
+          'response.data': Object.keys(response.data),
+          forecast_exists: !!response.data.forecast,
+          forecast_content: response.data.forecast,
+        });
+
+        console.log(
+          '🎯 Icon mapping için condition code:',
+          current.condition.code,
+        );
+
+        const weatherData: Weather = {
+          temp: Math.round(current.temp_c),
+          description: current.condition.text,
+          iconUrl: current.condition.icon,
+          humidity: current.humidity,
+          uv: current.uv,
+          air_quality: current.air_quality,
+          isDay: current.is_day,
+          minTemp: response.data.forecast?.mintemp_c || current.temp_c - 5,
+          maxTemp: response.data.forecast?.maxtemp_c || current.temp_c + 5,
+        };
+
+        setWeather(weatherData);
+
+        // Cache'e kaydet
+        await AsyncStorage.setItem(
+          '@weather_cache',
+          JSON.stringify(weatherData),
+        );
+        await AsyncStorage.setItem(
+          '@weather_last_fetch',
+          new Date().getTime().toString(),
+        );
+
+        console.log('💾 Weather data cached successfully');
+      } else {
+        console.error('Invalid weather data format:', response);
+      }
+    } catch (error) {
+      console.error('Failed to fetch weather:', error);
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
