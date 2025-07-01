@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { DesignSystem } from '../theme/designSystem';
+import {View, Text, StyleSheet} from 'react-native';
+import {DesignSystem} from '../theme/designSystem';
 
 export const AIAssistantScreen = () => {
   return (
@@ -15,10 +15,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: DesignSystem.Colors.neutral[50],
+    backgroundColor: DesignSystem.colors.neutral[50],
   },
   text: {
-    ...DesignSystem.Typography.h2,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.h2,
+    color: DesignSystem.colors.neutral[600],
   },
-}); 
+});

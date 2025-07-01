@@ -10,8 +10,10 @@ export const Colors = {
     50: '#FAFAFA', // Light background
     100: '#F5F5F5', // Card background
     200: '#E5E5E5', // Border
+    300: '#D1D5DB', // Light border
     400: '#A3A3A3', // Placeholder
     600: '#525252', // Secondary text
+    700: '#374151', // Darker text
     800: '#262626', // Primary text
     900: '#171717', // Headers
   },
@@ -78,9 +80,9 @@ export const Shadows = {
 };
 
 export const DesignSystem = {
-  Colors,
-  Typography,
-  Spacing,
-  BorderRadius,
-  Shadows,
+  colors: Colors,
+  typography: Typography,
+  spacing: Spacing,
+  borderRadius: BorderRadius,
+  shadows: Shadows,
 };

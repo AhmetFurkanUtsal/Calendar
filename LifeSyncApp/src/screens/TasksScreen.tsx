@@ -15,10 +15,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: DesignSystem.Colors.neutral[50],
+    backgroundColor: DesignSystem.colors.neutral[50],
   },
   text: {
-    ...DesignSystem.Typography.h2,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.h2,
+    color: DesignSystem.colors.neutral[600],
   },
 });

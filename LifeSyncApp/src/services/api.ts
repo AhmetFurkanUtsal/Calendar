@@ -3,28 +3,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Docker üzerinde çalışan backend'in IP adresi.
 // Android emülatörü için genellikle '10.0.2.2' kullanılır.
 // Fiziksel cihaz kullanılıyorsa, bilgisayarınızın yerel IP adresini yazmalısınız.
-const API_BASE_URL = 'http://10.0.2.2:3000/api';
+const API_BASE_URL = 'http://localhost:3000/api'; // Geliştirme için backend adresi
 
 class ApiService {
+  private baseURL = 'http://10.0.2.2:3000/api'; // Android emülatörü için
   private authToken: string | null = null;
 
   constructor() {
-    this.initializeAuthToken();
+    this.initializeAuth();
   }
 
-  private async initializeAuthToken() {
-    try {
-      const token = await AsyncStorage.getItem('@auth_token');
-      this.authToken = token;
-      console.log('Auth token initialized:', !!token);
-    } catch (error) {
-      console.error('Failed to load auth token from storage', error);
-    }
+  async initializeAuth() {
+    this.authToken = await AsyncStorage.getItem('@auth_token');
   }
 
   async setAuthToken(token: string) {
     this.authToken = token;
     await AsyncStorage.setItem('@auth_token', token);
+  }
+
+  async getAuthToken() {
+    if (!this.authToken) {
+      this.authToken = await AsyncStorage.getItem('@auth_token');
+    }
+    return this.authToken;
   }
 
   async clearAuthToken() {
@@ -33,105 +35,180 @@ class ApiService {
   }
 
   private async request(endpoint: string, options: RequestInit = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${this.baseURL}${endpoint}`;
 
-    const headers: Record<string, string> = {
+    const headers = {
       'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
+      ...(this.authToken && {Authorization: `Bearer ${this.authToken}`}),
+      ...options.headers,
     };
 
-    if (this.authToken) {
-      headers['Authorization'] = `Bearer ${this.authToken}`;
-    }
-
     try {
-      console.log(`🚀 Sending API request to: ${url}`, {
+      console.log('API Request:', {
+        url,
         method: options.method || 'GET',
-        body: options.body ? '...' : undefined,
+        body: options.body,
       });
 
-      const response = await fetch(url, {...options, headers});
+      const response = await fetch(url, {
+        ...options,
+        headers,
+      });
 
-      const responseData = await response.json();
+      const data = await response.json();
+
+      console.log('API Response:', {
+        status: response.status,
+        data,
+      });
 
       if (!response.ok) {
-        console.error(
-          `❌ API Error: ${response.status} ${response.statusText}`,
-          responseData,
-        );
-        throw new Error(
-          responseData.error || `HTTP error! status: ${response.status}`,
-        );
+        // Detaylı hata mesajı oluştur
+        let errorMessage = data.error || `HTTP ${response.status}`;
+
+        if (data.errors && Array.isArray(data.errors)) {
+          const errorDetails = data.errors
+            .map((err: any) => `${err.field}: ${err.message}`)
+            .join(', ');
+          errorMessage += ` - ${errorDetails}`;
+        }
+
+        throw new Error(errorMessage);
       }
 
-      console.log(`✅ API Response from: ${url}`, responseData);
-      return responseData;
-    } catch (error) {
+      return data;
+    } catch (error: any) {
       console.error('API Request failed:', error);
+      if (error.message.includes('401') || error.message.includes('403')) {
+        await this.clearAuthToken();
+      }
       throw error;
     }
   }
 
-  // --- Auth Endpoints ---
-  login(email: string, password: string) {
+  // HTTP Methods
+  async get(endpoint: string, params: Record<string, any> = {}) {
+    const queryParams = new URLSearchParams(params).toString();
+    const url = queryParams ? `${endpoint}?${queryParams}` : endpoint;
+    return this.request(url);
+  }
+
+  async post(endpoint: string, data: any = {}) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async put(endpoint: string, data: any = {}) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async patch(endpoint: string, data: any = {}) {
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async delete(endpoint: string) {
+    return this.request(endpoint, {
+      method: 'DELETE',
+    });
+  }
+
+  // Auth endpoints
+  async login(email: string, password: string) {
     return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({email, password}),
     });
   }
 
-  register(userData: any) {
+  async register(userData: any) {
     return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     });
   }
 
-  logout() {
+  async getMe() {
+    return this.request('/auth/me');
+  }
+
+  async logout() {
     return this.request('/auth/logout', {
       method: 'POST',
     });
   }
 
+  // User endpoints
+  async updateLifestyle(categories: string[], preferences: any = {}) {
+    return this.request('/users/lifestyle', {
+      method: 'PATCH',
+      body: JSON.stringify({categories, preferences}),
+    });
+  }
+
+  // Health check
+  async healthCheck() {
+    const response = await fetch('http://10.0.2.2:3000/health');
+    return response.json();
+  }
+
   // --- Task Endpoints ---
   getTasks(filters: any = {}) {
     const queryParams = new URLSearchParams(filters).toString();
-    return this.request(`/tasks?${queryParams}`);
+    return this.get(`/tasks?${queryParams}`);
   }
 
   createTask(taskData: any) {
-    return this.request('/tasks', {
-      method: 'POST',
-      body: JSON.stringify(taskData),
-    });
+    return this.post('/tasks', taskData);
   }
 
   updateTask(taskId: string, updates: any) {
-    return this.request(`/tasks/${taskId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(updates),
-    });
+    return this.put(`/tasks/${taskId}`, updates);
   }
 
   deleteTask(taskId: string) {
-    return this.request(`/tasks/${taskId}`, {
-      method: 'DELETE',
-    });
+    return this.delete(`/tasks/${taskId}`);
   }
 
   // --- Event Endpoints ---
   getEvents(filters: any = {}) {
     const queryParams = new URLSearchParams(filters).toString();
-    return this.request(`/events?${queryParams}`);
+    return this.get(`/events?${queryParams}`);
   }
 
   // --- Weather Endpoint ---
   getWeather(city: string) {
-    return this.request(`/weather?city=${city}`);
+    return this.get(`/weather?city=${city}`);
+  }
+
+  // Prayer times endpoints
+  async getPrayerTimes(city?: string, date?: string) {
+    const params = new URLSearchParams();
+    if (city) params.append('city', city);
+    if (date) params.append('date', date);
+
+    return this.request(`/prayer-times?${params.toString()}`);
+  }
+
+  async markPrayerCompleted(prayerName: string, prayerTime: string) {
+    return this.request('/prayer-times/complete', {
+      method: 'POST',
+      body: JSON.stringify({
+        prayerName,
+        prayerTime,
+        completedAt: new Date().toISOString(),
+      }),
+    });
   }
 
   // Diğer endpoint'ler (notes, ai, vb.) buraya eklenebilir.
 }
 
-const apiService = new ApiService();
-export default apiService;
+export default new ApiService();

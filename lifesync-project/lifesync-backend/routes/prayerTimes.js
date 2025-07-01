@@ -3,6 +3,7 @@ const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const { authenticateToken } = require("../middleware/auth");
 const ActivityLogger = require("../services/ActivityLogger");
+const axios = require("axios");
 
 const prisma = new PrismaClient();
 
@@ -215,5 +216,199 @@ router.get(
     }
   }
 );
+
+// Namaz vakitleri için Afyon Sandıklı koordinatları
+const AFYON_SANDIKLI = {
+  lat: 38.4667,
+  lng: 30.2667,
+  name: "Afyon Sandıklı",
+};
+
+// GET /api/prayer-times - Günlük namaz vakitleri
+router.get("/", authenticateToken, async (req, res) => {
+  try {
+    const { date, city } = req.query;
+    const targetDate = date || new Date().toISOString().split("T")[0];
+
+    // Şimdilik sadece Afyon Sandıklı için
+    const location = AFYON_SANDIKLI;
+
+    // Namaz vakti API'sinden veri çek
+    const response = await axios.get(
+      `https://vakit.vercel.app/api/timesForGPS?lat=${location.lat}&lng=${location.lng}&timezoneOffset=180&lang=tr`
+    );
+
+    console.log("🕌 Prayer Times API Response:", response.data);
+
+    const prayerData = response.data;
+
+    // API response formatını kontrol et
+    if (!prayerData || !prayerData.times) {
+      throw new Error(
+        "Namaz vakitleri API'sinden geçersiz veri formatı alındı"
+      );
+    }
+
+    // Bugünkü tarihi al veya belirtilen tarihi kullan
+    const todayTimes =
+      prayerData.times[targetDate] || Object.values(prayerData.times)[0];
+
+    if (!todayTimes || !Array.isArray(todayTimes) || todayTimes.length < 6) {
+      throw new Error("Namaz vakitleri API'sinden eksik veri alındı");
+    }
+
+    // Array formatından object formatına dönüştür
+    // [İmsak, Güneş, Öğle, İkindi, Akşam, Yatsı]
+    const prayerTimes = {
+      location: prayerData.place?.name || location.name,
+      date: targetDate,
+      times: {
+        imsak: todayTimes[0],
+        gunes: todayTimes[1],
+        ogle: todayTimes[2],
+        ikindi: todayTimes[3],
+        aksam: todayTimes[4],
+        yatsi: todayTimes[5],
+      },
+      hijriDate: formatHijriDate(),
+      nextPrayer: getNextPrayer(todayTimes),
+      place: prayerData.place,
+    };
+
+    console.log("🕌 Formatted Prayer Times:", prayerTimes);
+
+    res.json({
+      success: true,
+      data: prayerTimes,
+    });
+  } catch (error) {
+    console.error("❌ Prayer times fetch error:", error.message);
+
+    // Hiçbir statik fallback yok - sadece hata mesajı
+    res.status(500).json({
+      success: false,
+      error: "Namaz vakitleri alınamadı",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+});
+
+// Sonraki namaz vaktini hesapla (Array formatı için)
+function getNextPrayer(prayerTimesArray) {
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  // Prayer names ve times
+  const prayers = [
+    { name: "İmsak", time: prayerTimesArray[0] },
+    { name: "Güneş", time: prayerTimesArray[1] },
+    { name: "Öğle", time: prayerTimesArray[2] },
+    { name: "İkindi", time: prayerTimesArray[3] },
+    { name: "Akşam", time: prayerTimesArray[4] },
+    { name: "Yatsı", time: prayerTimesArray[5] },
+  ];
+
+  console.log("🕌 Processed prayers from array:", prayers);
+
+  for (let prayer of prayers) {
+    // Time string kontrolü
+    if (!prayer.time || typeof prayer.time !== "string") {
+      console.log(`⚠️ Invalid time for ${prayer.name}:`, prayer.time);
+      continue;
+    }
+
+    const timeParts = prayer.time.split(":");
+    if (timeParts.length !== 2) {
+      console.log(`⚠️ Invalid time format for ${prayer.name}:`, prayer.time);
+      continue;
+    }
+
+    const hours = parseInt(timeParts[0]);
+    const minutes = parseInt(timeParts[1]);
+
+    if (isNaN(hours) || isNaN(minutes)) {
+      console.log(`⚠️ Invalid time numbers for ${prayer.name}:`, prayer.time);
+      continue;
+    }
+
+    const prayerTime = hours * 60 + minutes;
+
+    if (currentTime < prayerTime) {
+      const timeLeft = prayerTime - currentTime;
+      const hoursLeft = Math.floor(timeLeft / 60);
+      const minutesLeft = timeLeft % 60;
+
+      return {
+        name: prayer.name,
+        time: prayer.time,
+        timeLeft: `${hoursLeft}:${minutesLeft.toString().padStart(2, "0")}`,
+      };
+    }
+  }
+
+  // Eğer gün bitti, yarınki ilk namaz (İmsak)
+  return {
+    name: "İmsak",
+    time: prayers[0].time,
+    timeLeft: "Yarın",
+  };
+}
+
+// Basit Hijri tarih formatı (yaklaşık)
+function formatHijriDate() {
+  const now = new Date();
+  const hijriYear = now.getFullYear() - 579; // Yaklaşık dönüşüm
+  const months = [
+    "Muharrem",
+    "Safer",
+    "Rebiyülev",
+    "Rebiyülahhir",
+    "Cemaziyelvev",
+    "Cemazülahhir",
+    "Recep",
+    "Şaban",
+    "Ramazan",
+    "Şeval",
+    "Zilkade",
+    "Zilhicce",
+  ];
+  const month = months[now.getMonth()];
+  return `${now.getDate()} ${month} ${hijriYear}`;
+}
+
+// POST /api/prayer-times/complete - Namaz kılındı olarak işaretle
+router.post("/complete", authenticateToken, async (req, res) => {
+  try {
+    const { prayerName, prayerTime, completedAt } = req.body;
+    const userId = req.user.id;
+
+    // Log prayer activity
+    await ActivityLogger.logPrayer(userId, prayerName, prayerTime);
+
+    // Update user stats - total prayers performed
+    await prisma.userStats.upsert({
+      where: { userId },
+      update: {
+        totalPrayersPerformed: { increment: 1 },
+      },
+      create: {
+        userId,
+        totalPrayersPerformed: 1,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `${prayerName} namazı kaydedildi`,
+    });
+  } catch (error) {
+    console.error("Prayer completion error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Namaz kaydedilemedi",
+    });
+  }
+});
 
 module.exports = router;

@@ -17,7 +17,7 @@ function App(): React.JSX.Element {
     <>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor={DesignSystem.Colors.neutral[50]}
+        backgroundColor={DesignSystem.colors.neutral[50]}
       />
       <AppNavigator />
     </>

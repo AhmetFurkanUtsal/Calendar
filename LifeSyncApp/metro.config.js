@@ -7,6 +7,9 @@ const path = require('path');
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
+
+const defaultConfig = getDefaultConfig(__dirname);
+
 const config = {
   resolver: {
     alias: {
@@ -19,6 +22,8 @@ const config = {
       '@/utils': path.resolve(__dirname, 'src/utils'),
       '@/types': path.resolve(__dirname, 'src/types'),
     },
+    // Lottie animasyon dosyaları için asset uzantıları
+    assetExts: [...defaultConfig.resolver.assetExts, 'lottie'],
   },
   transformer: {
     unstable_allowRequireContext: true,

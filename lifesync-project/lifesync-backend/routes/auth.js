@@ -19,8 +19,14 @@ const generateToken = (userId) => {
 // POST /api/auth/register - Yeni kullanıcı kaydı
 router.post("/register", validate(userSchemas.register), async (req, res) => {
   try {
-    const { email, password, displayName, categories, city, timezone } =
-      req.body;
+    const {
+      email,
+      password,
+      displayName,
+      categories = [],
+      city,
+      timezone,
+    } = req.body;
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -283,6 +289,52 @@ router.post("/verify-email", authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Email doğrulama sırasında bir hata oluştu.",
+    });
+  }
+});
+
+// POST /api/auth/update-lifestyle - Yaşam tarzı güncelleme
+router.post("/update-lifestyle", authenticateToken, async (req, res) => {
+  try {
+    const { categories } = req.body;
+
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "En az bir yaşam tarzı kategorisi seçmelisiniz.",
+      });
+    }
+
+    // Update user lifestyle
+    await prisma.userLifestyle.update({
+      where: { userId: req.user.id },
+      data: {
+        categories,
+        preferences: {},
+      },
+    });
+
+    // Update settings based on lifestyle
+    await prisma.userSettings.update({
+      where: { userId: req.user.id },
+      data: {
+        notifications: {
+          email: true,
+          push: true,
+          prayerReminders: categories.includes("dini"),
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Yaşam tarzı bilgileriniz güncellendi!",
+    });
+  } catch (error) {
+    console.error("Update lifestyle error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Yaşam tarzı güncellenirken bir hata oluştu.",
     });
   }
 });

@@ -17,8 +17,11 @@ import {
   Sun,
   Droplets,
   Wind,
+  LogOut,
 } from 'lucide-react-native';
 import {DesignSystem} from '../theme/designSystem';
+import {useAuthStore} from '../stores/authStore';
+import {PrayerTimesWidget} from '../components/widgets/PrayerTimesWidget';
 import apiService from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -28,14 +31,6 @@ interface Task {
   title: string;
   category: string;
   isCompleted: boolean;
-}
-
-interface Event {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-  category: string;
 }
 
 interface AirQuality {
@@ -73,35 +68,33 @@ const mockTasks: Task[] = [
   {id: '3', title: 'Geri dönüşüm', category: 'cevre', isCompleted: true},
 ];
 
-const mockEvents: Event[] = [
-  {
-    id: '1',
-    title: 'Toplantı',
-    startTime: '10:00',
-    endTime: '11:00',
-    category: 'kariyer',
-  },
-  {
-    id: '2',
-    title: 'Spor',
-    startTime: '18:00',
-    endTime: '19:00',
-    category: 'saglik',
-  },
-];
-
 // --- Sub-components ---
-const Header: React.FC = () => (
-  <View style={styles.header}>
-    <View>
-      <Text style={styles.headerGreeting}>Merhaba,</Text>
-      <Text style={styles.headerUser}>Kullanıcı</Text>
+const Header: React.FC = () => {
+  const {logout, user} = useAuthStore();
+
+  const handleLogout = async () => {
+    await logout();
+  };
+
+  return (
+    <View style={styles.header}>
+      <View>
+        <Text style={styles.headerGreeting}>Merhaba,</Text>
+        <Text style={styles.headerUser}>
+          {user?.displayName || 'Kullanıcı'}
+        </Text>
+      </View>
+      <View style={styles.headerActions}>
+        <TouchableOpacity style={styles.profileIconContainer}>
+          <User size={24} color={DesignSystem.colors.primary[500]} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LogOut size={20} color={DesignSystem.colors.neutral[600]} />
+        </TouchableOpacity>
+      </View>
     </View>
-    <TouchableOpacity style={styles.profileIconContainer}>
-      <User size={24} color={DesignSystem.Colors.primary[500]} />
-    </TouchableOpacity>
-  </View>
-);
+  );
+};
 
 const getAirQualityText = (index?: number) => {
   if (!index) {
@@ -138,13 +131,13 @@ const WeatherCard: React.FC<WeatherCardProps> = ({
 }) => (
   <View style={styles.weatherCard}>
     {loading ? (
-      <ActivityIndicator color={DesignSystem.Colors.primary[500]} />
+      <ActivityIndicator color={DesignSystem.colors.primary[500]} />
     ) : weather ? (
       <>
         <View style={styles.weatherHeader}>
           <Text style={styles.weatherLocation}>{city}</Text>
           <TouchableOpacity>
-            <MapPin size={16} color={DesignSystem.Colors.neutral[400]} />
+            <MapPin size={16} color={DesignSystem.colors.neutral[400]} />
           </TouchableOpacity>
         </View>
         <View style={styles.weatherContent}>
@@ -165,15 +158,15 @@ const WeatherCard: React.FC<WeatherCardProps> = ({
         </View>
         <View style={styles.weatherDetails}>
           <View style={styles.detailItem}>
-            <Droplets size={14} color={DesignSystem.Colors.neutral[600]} />
+            <Droplets size={14} color={DesignSystem.colors.neutral[600]} />
             <Text style={styles.detailText}>{weather.humidity}%</Text>
           </View>
           <View style={styles.detailItem}>
-            <Sun size={16} color={DesignSystem.Colors.neutral[600]} />
+            <Sun size={16} color={DesignSystem.colors.neutral[600]} />
             <Text style={styles.detailText}>UV {weather.uv}</Text>
           </View>
           <View style={styles.detailItem}>
-            <Wind size={14} color={DesignSystem.Colors.neutral[600]} />
+            <Wind size={14} color={DesignSystem.colors.neutral[600]} />
             <Text style={styles.detailText}>
               {getAirQualityText(weather.air_quality?.['us-epa-index'])}
             </Text>
@@ -222,9 +215,9 @@ const TasksCard: React.FC<TasksCardProps> = ({tasks}) => (
             styles.taskCategoryIndicator,
             {
               backgroundColor:
-                DesignSystem.Colors.lifestyle[
-                  task.category as keyof typeof DesignSystem.Colors.lifestyle
-                ] || '#CCC',
+                DesignSystem.colors.lifestyle[
+                  task.category as keyof typeof DesignSystem.colors.lifestyle
+                ] || DesignSystem.colors.neutral[400],
             },
           ]}
         />
@@ -240,9 +233,9 @@ const TasksCard: React.FC<TasksCardProps> = ({tasks}) => (
             task.isCompleted && styles.taskButtonCompleted,
           ]}>
           {task.isCompleted ? (
-            <Check size={20} color={DesignSystem.Colors.primary[500]} />
+            <Check size={20} color={DesignSystem.colors.primary[500]} />
           ) : (
-            <Plus size={20} color={DesignSystem.Colors.primary[500]} />
+            <Plus size={20} color={DesignSystem.colors.primary[500]} />
           )}
         </TouchableOpacity>
       </View>
@@ -254,73 +247,16 @@ const TasksCard: React.FC<TasksCardProps> = ({tasks}) => (
   </View>
 );
 
-interface EventsCardProps {
-  events: Event[];
-}
-
-const EventsCard: React.FC<EventsCardProps> = ({events}) => (
-  <View style={styles.card}>
-    <View style={styles.cardHeader}>
-      <Text style={styles.cardTitle}>Bugünün Etkinlikleri</Text>
-      <TouchableOpacity>
-        <Text style={styles.seeAll}>Tümünü Gör</Text>
-      </TouchableOpacity>
-    </View>
-    {events.map(event => (
-      <View key={event.id} style={styles.eventItem}>
-        <View
-          style={[
-            styles.eventTimeContainer,
-            {
-              borderColor:
-                DesignSystem.Colors.lifestyle[
-                  event.category as keyof typeof DesignSystem.Colors.lifestyle
-                ],
-            },
-          ]}>
-          <Text
-            style={[
-              styles.eventTime,
-              {
-                color:
-                  DesignSystem.Colors.lifestyle[
-                    event.category as keyof typeof DesignSystem.Colors.lifestyle
-                  ],
-              },
-            ]}>
-            {event.startTime}
-          </Text>
-        </View>
-        <View>
-          <Text style={styles.eventTitle}>{event.title}</Text>
-          <Text style={styles.eventDuration}>
-            {event.startTime} - {event.endTime}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.eventDetailsButton}>
-          <Text
-            style={[
-              styles.eventDetailsText,
-              {
-                color:
-                  DesignSystem.Colors.lifestyle[
-                    event.category as keyof typeof DesignSystem.Colors.lifestyle
-                  ],
-              },
-            ]}>
-            ?
-          </Text>
-        </TouchableOpacity>
-      </View>
-    ))}
-  </View>
-);
-
 // --- Main Component ---
 export const HomeScreen: React.FC = () => {
   const [weather, setWeather] = useState<Weather | null>(null);
   const [weatherLoading, setWeatherLoading] = useState<boolean>(true);
   const [weatherCity] = useState<string>('Afyonkarahisar, Sandıklı');
+  const {user} = useAuthStore();
+
+  // Kullanıcının dini kategoriyi seçip seçmediğini kontrol et
+  const hasReligiousCategory =
+    user?.lifestyle?.categories?.includes('dini') || false;
 
   useEffect(() => {
     const thirtyMinutes = 30 * 60 * 1000; // 30 dakika
@@ -436,9 +372,10 @@ export const HomeScreen: React.FC = () => {
           loading={weatherLoading}
           city={weatherCity}
         />
+        {/* Namaz Vakitleri Widget - Sadece dini kategori seçen kullanıcılar için */}
+        {hasReligiousCategory && <PrayerTimesWidget />}
         <StatsCard />
         <TasksCard tasks={mockTasks} />
-        <EventsCard events={mockEvents} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -446,72 +383,87 @@ export const HomeScreen: React.FC = () => {
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: DesignSystem.Colors.neutral[50]},
+  container: {flex: 1, backgroundColor: DesignSystem.colors.neutral[50]},
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: DesignSystem.Spacing.lg,
+    paddingHorizontal: DesignSystem.spacing.md,
+    paddingVertical: DesignSystem.spacing.sm,
+    backgroundColor: '#FFFFFF',
   },
   headerGreeting: {
-    ...DesignSystem.Typography.body,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.body,
+    color: DesignSystem.colors.neutral[600],
   },
   headerUser: {
-    ...DesignSystem.Typography.h1,
-    color: DesignSystem.Colors.neutral[900],
-    fontWeight: 'bold',
+    ...DesignSystem.typography.h3,
+    color: DesignSystem.colors.neutral[900],
+    fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: DesignSystem.spacing.sm,
   },
   profileIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: DesignSystem.Colors.primary[100],
+    backgroundColor: DesignSystem.colors.primary[100],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: DesignSystem.colors.neutral[100],
     justifyContent: 'center',
     alignItems: 'center',
   },
   weatherCard: {
     backgroundColor: '#FFFFFF',
-    marginHorizontal: DesignSystem.Spacing.lg,
-    padding: DesignSystem.Spacing.md,
-    borderRadius: DesignSystem.BorderRadius.lg,
-    ...DesignSystem.Shadows.sm,
+    marginHorizontal: DesignSystem.spacing.md,
+    padding: DesignSystem.spacing.md,
+    borderRadius: DesignSystem.borderRadius.lg,
+    ...DesignSystem.shadows.sm,
     flexDirection: 'column',
   },
   weatherHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: DesignSystem.Spacing.md,
+    marginBottom: DesignSystem.spacing.md,
   },
   weatherLocation: {
-    ...DesignSystem.Typography.body,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.body,
+    color: DesignSystem.colors.neutral[600],
   },
   weatherContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   weatherTemp: {
-    ...DesignSystem.Typography.h2,
-    color: DesignSystem.Colors.neutral[800],
-    marginHorizontal: DesignSystem.Spacing.md,
+    ...DesignSystem.typography.h2,
+    color: DesignSystem.colors.neutral[800],
+    marginHorizontal: DesignSystem.spacing.md,
   },
   temperatureContainer: {
     alignItems: 'center',
-    marginHorizontal: DesignSystem.Spacing.md,
+    marginHorizontal: DesignSystem.spacing.md,
   },
   tempRange: {
-    ...DesignSystem.Typography.caption,
-    color: DesignSystem.Colors.neutral[600],
-    marginTop: DesignSystem.Spacing.xs,
+    ...DesignSystem.typography.caption,
+    color: DesignSystem.colors.neutral[600],
+    marginTop: DesignSystem.spacing.xs,
   },
   weatherDescContainer: {
     flex: 1,
   },
   weatherDesc: {
-    ...DesignSystem.Typography.body,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.body,
+    color: DesignSystem.colors.neutral[600],
   },
   weatherIcon: {
     width: 50,
@@ -520,83 +472,83 @@ const styles = StyleSheet.create({
   weatherDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: DesignSystem.Spacing.md,
-    paddingTop: DesignSystem.Spacing.md,
+    marginTop: DesignSystem.spacing.md,
+    paddingTop: DesignSystem.spacing.md,
     borderTopWidth: 1,
-    borderTopColor: DesignSystem.Colors.neutral[100],
+    borderTopColor: DesignSystem.colors.neutral[100],
   },
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   detailText: {
-    ...DesignSystem.Typography.caption,
-    color: DesignSystem.Colors.neutral[600],
-    marginLeft: DesignSystem.Spacing.xs,
+    ...DesignSystem.typography.caption,
+    color: DesignSystem.colors.neutral[600],
+    marginLeft: DesignSystem.spacing.xs,
   },
   statsCard: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: '#FFFFFF',
-    marginHorizontal: DesignSystem.Spacing.lg,
-    marginTop: DesignSystem.Spacing.md,
-    padding: DesignSystem.Spacing.md,
-    borderRadius: DesignSystem.BorderRadius.lg,
-    ...DesignSystem.Shadows.sm,
+    marginHorizontal: DesignSystem.spacing.lg,
+    marginTop: DesignSystem.spacing.md,
+    padding: DesignSystem.spacing.md,
+    borderRadius: DesignSystem.borderRadius.lg,
+    ...DesignSystem.shadows.sm,
   },
   statItem: {alignItems: 'center'},
   statValue: {
-    ...DesignSystem.Typography.h3,
-    color: DesignSystem.Colors.neutral[800],
+    ...DesignSystem.typography.h3,
+    color: DesignSystem.colors.neutral[800],
     fontWeight: '600',
   },
   statLabel: {
-    ...DesignSystem.Typography.caption,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.caption,
+    color: DesignSystem.colors.neutral[600],
   },
   card: {
     backgroundColor: '#FFFFFF',
-    margin: DesignSystem.Spacing.lg,
-    padding: DesignSystem.Spacing.md,
-    borderRadius: DesignSystem.BorderRadius.lg,
-    ...DesignSystem.Shadows.sm,
+    margin: DesignSystem.spacing.lg,
+    padding: DesignSystem.spacing.md,
+    borderRadius: DesignSystem.borderRadius.lg,
+    ...DesignSystem.shadows.sm,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: DesignSystem.Spacing.md,
+    marginBottom: DesignSystem.spacing.md,
   },
   cardTitle: {
-    ...DesignSystem.Typography.h2,
-    color: DesignSystem.Colors.neutral[900],
+    ...DesignSystem.typography.h2,
+    color: DesignSystem.colors.neutral[900],
     fontWeight: 'bold',
   },
   seeAll: {
-    ...DesignSystem.Typography.body,
-    color: DesignSystem.Colors.primary[500],
+    ...DesignSystem.typography.body,
+    color: DesignSystem.colors.primary[500],
   },
   taskItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: DesignSystem.Spacing.md,
+    paddingVertical: DesignSystem.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: DesignSystem.Colors.neutral[100],
+    borderBottomColor: DesignSystem.colors.neutral[100],
   },
   taskCategoryIndicator: {
     width: 4,
     height: 40,
     borderRadius: 2,
-    marginRight: DesignSystem.Spacing.md,
+    marginRight: DesignSystem.spacing.md,
   },
   taskTitle: {
-    ...DesignSystem.Typography.body,
-    color: DesignSystem.Colors.neutral[800],
+    ...DesignSystem.typography.body,
+    color: DesignSystem.colors.neutral[800],
     fontWeight: '500',
   },
   taskCategory: {
-    ...DesignSystem.Typography.caption,
-    color: DesignSystem.Colors.neutral[600],
+    ...DesignSystem.typography.caption,
+    color: DesignSystem.colors.neutral[600],
   },
   taskButton: {
     marginLeft: 'auto',
@@ -604,54 +556,24 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: DesignSystem.Colors.primary[100],
+    borderColor: DesignSystem.colors.primary[100],
     justifyContent: 'center',
     alignItems: 'center',
   },
-  taskButtonCompleted: {backgroundColor: DesignSystem.Colors.primary[100]},
+  taskButtonCompleted: {backgroundColor: DesignSystem.colors.primary[100]},
   addTaskButton: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: DesignSystem.Colors.primary[500],
-    padding: DesignSystem.Spacing.md,
-    borderRadius: DesignSystem.BorderRadius.md,
-    marginTop: DesignSystem.Spacing.md,
+    backgroundColor: DesignSystem.colors.primary[500],
+    padding: DesignSystem.spacing.md,
+    borderRadius: DesignSystem.borderRadius.md,
+    marginTop: DesignSystem.spacing.md,
   },
   addTaskButtonText: {
-    ...DesignSystem.Typography.body,
+    ...DesignSystem.typography.body,
     color: '#FFFFFF',
     fontWeight: 'bold',
-    marginLeft: DesignSystem.Spacing.sm,
+    marginLeft: DesignSystem.spacing.sm,
   },
-  eventItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: DesignSystem.Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: DesignSystem.Colors.neutral[100],
-  },
-  eventTimeContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: DesignSystem.Spacing.md,
-  },
-  eventTime: {...DesignSystem.Typography.h3, fontWeight: 'bold'},
-  eventTitle: {...DesignSystem.Typography.body, fontWeight: 'bold'},
-  eventDuration: {
-    ...DesignSystem.Typography.caption,
-    color: DesignSystem.Colors.neutral[600],
-  },
-  eventDetailsButton: {
-    marginLeft: 'auto',
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  eventDetailsText: {...DesignSystem.Typography.h2, fontWeight: 'bold'},
 });

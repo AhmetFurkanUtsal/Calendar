@@ -45,12 +45,8 @@ const userSchemas = {
           "saglik"
         )
       )
-      .min(1)
-      .required()
-      .messages({
-        "array.min": "En az bir yaşam tarzı kategorisi seçmelisiniz",
-        "any.required": "Yaşam tarzı kategorileri zorunludur",
-      }),
+      .optional()
+      .default([]),
     city: Joi.string().optional(),
     timezone: Joi.string().optional().default("Europe/Istanbul"),
   }),
