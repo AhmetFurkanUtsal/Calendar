@@ -30,6 +30,7 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://username:password@db:5432/lifesync_db
       JWT_SECRET: lifesync_super_secret_jwt_key_2024_production
+      WEATHER_API_KEY: 607e6836f17b4dfc966100740252906
     depends_on:
       db:
         condition: service_healthy
