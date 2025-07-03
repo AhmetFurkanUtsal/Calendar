@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,12 @@ import {
   SafeAreaView,
   StyleSheet,
   FlatList,
+  Alert,
 } from 'react-native';
 import {Calendar} from 'react-native-calendars';
 import Icon from 'react-native-vector-icons/Feather';
 import {DesignSystem} from '../theme/designSystem';
+import holidaysService, {Holiday} from '../services/holidaysService';
 
 // Örnek event'ler
 const mockEvents = [
@@ -40,12 +42,36 @@ export const CalendarScreen = () => {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0],
   );
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidaysLoading, setHolidaysLoading] = useState(false);
+
+  // API'den Türkiye tatillerini çek
+  useEffect(() => {
+    const loadHolidays = async () => {
+      setHolidaysLoading(true);
+      try {
+        const currentYear = new Date().getFullYear();
+        const turkeyHolidays = await holidaysService.getTurkeyHolidays(
+          currentYear,
+        );
+        setHolidays(turkeyHolidays);
+        console.log('🏛️ Türkiye tatilleri yüklendi:', turkeyHolidays.length);
+      } catch (error) {
+        console.error('❌ Tatiller yüklenemedi:', error);
+        Alert.alert('Hata', 'Tatil bilgileri yüklenemedi');
+      } finally {
+        setHolidaysLoading(false);
+      }
+    };
+
+    loadHolidays();
+  }, []);
 
   // Calendar marked dates
   const getMarkedDates = () => {
     const marked: any = {};
 
-    // Bugünkü event'leri işaretle
+    // Mock event'leri işaretle
     mockEvents.forEach(event => {
       const dateString = selectedDate;
       if (!marked[dateString]) {
@@ -55,6 +81,18 @@ export const CalendarScreen = () => {
       marked[dateString].dots.push({
         color: event.color,
         key: event.id,
+      });
+    });
+
+    // API'den gelen Türkiye tatillerini işaretle
+    holidays.forEach(holiday => {
+      if (!marked[holiday.date]) {
+        marked[holiday.date] = {dots: []};
+      }
+
+      marked[holiday.date].dots.push({
+        color: holiday.color,
+        key: `holiday-${holiday.date}`,
       });
     });
 
@@ -70,8 +108,28 @@ export const CalendarScreen = () => {
     return marked;
   };
 
+  // Seçili tarihteki tüm etkinlikleri getir (mockEvents + holidays)
+  const getEventsForDate = (date: string) => {
+    const events: any[] = [...mockEvents];
+
+    // Bu tarihteki tatilleri ekle
+    const dayHolidays = holidays.filter(holiday => holiday.date === date);
+    dayHolidays.forEach(holiday => {
+      events.push({
+        id: `holiday-${holiday.date}`,
+        title: `🇹🇷 ${holiday.name}`,
+        time: 'Tüm Gün',
+        category: holiday.type === 'national' ? 'resmi-tatil' : 'dini-bayram',
+        color: holiday.color,
+        isHoliday: true,
+      });
+    });
+
+    return events;
+  };
+
   // Event render item
-  const renderEventItem = ({item}: {item: (typeof mockEvents)[0]}) => (
+  const renderEventItem = ({item}: {item: any}) => (
     <TouchableOpacity style={styles.eventItem}>
       <View style={[styles.eventDot, {backgroundColor: item.color}]} />
       <View style={styles.eventContent}>
@@ -132,10 +190,13 @@ export const CalendarScreen = () => {
 
       {/* Events List */}
       <View style={styles.eventsContainer}>
-        <Text style={styles.eventsTitle}>{selectedDate} - Etkinlikler</Text>
+        <Text style={styles.eventsTitle}>
+          {selectedDate} - Etkinlikler
+          {holidaysLoading && ' (Tatiller yükleniyor...)'}
+        </Text>
 
         <FlatList
-          data={mockEvents}
+          data={getEventsForDate(selectedDate)}
           keyExtractor={item => item.id}
           renderItem={renderEventItem}
           contentContainerStyle={styles.eventsList}

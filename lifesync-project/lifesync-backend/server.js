@@ -12,7 +12,12 @@ const prisma = new PrismaClient();
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: true, // Development için tüm origin'leri kabul et
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
 app.use(compression());
 app.use(morgan("combined"));
 app.use(express.json({ limit: "50mb" }));
@@ -34,6 +39,7 @@ app.use("/api/analytics", require("./routes/analytics"));
 app.use("/api/community", require("./routes/community"));
 app.use("/api/prayer-times", require("./routes/prayerTimes"));
 app.use("/api/weather", require("./routes/weather"));
+app.use("/api/holidays", require("./routes/holidays"));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
